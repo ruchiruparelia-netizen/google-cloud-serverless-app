@@ -1,0 +1,87 @@
+{
+  "eval_set_id": "eval-infrastructure-cicd",
+  "name": "Criterion 5: Infrastructure & CI/CD Evaluation Set",
+  "description": "Evaluates containerization, Cloud Run serverless readiness, CI/CD automated pipelines, and test coverage.",
+  "max_score": 19,
+  "eval_cases": [
+    {
+      "eval_id": "eval_infra_01_dockerfile_multi_stage",
+      "name": "Production Multi-Stage Dockerfile",
+      "target_pillar": "Infrastructure & CI/CD",
+      "weight_points": 5,
+      "description": "Validates multi-stage Docker build, unprivileged runtime, uvicorn entrypoint, and optimized layer caching.",
+      "file_to_check": "Dockerfile",
+      "required_directives": [
+        "FROM python:3.11-slim as builder",
+        "FROM python:3.11-slim",
+        "COPY --from=builder /root/.local /root/.local",
+        "uvicorn",
+        "web_server:app"
+      ],
+      "rubrics": [
+        {
+          "rubric_id": "rubric_docker_best_practices",
+          "description": "Dockerfile must adhere to Google Cloud Run container best practices.",
+          "type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "eval_id": "eval_infra_02_cloud_build_pipeline",
+      "name": "Google Cloud Build Automated CI/CD Pipeline",
+      "target_pillar": "Infrastructure & CI/CD",
+      "weight_points": 5,
+      "description": "Verifies cloudbuild.yaml has steps for linting, pytest, adk conformance, docker build, artifact push, and cloud run deployment.",
+      "file_to_check": "cloudbuild.yaml",
+      "required_steps": [
+        "unit-tests-and-lint",
+        "adk-conformance-eval",
+        "docker-build",
+        "docker-push",
+        "deploy-cloud-run"
+      ],
+      "rubrics": [
+        {
+          "rubric_id": "rubric_gcp_cicd_pipeline",
+          "description": "Cloud Build definition must automate testing, security scans, and deployment.",
+          "type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "eval_id": "eval_infra_03_github_actions_workflow",
+      "name": "GitHub Actions Continuous Integration",
+      "target_pillar": "Infrastructure & CI/CD",
+      "weight_points": 5,
+      "description": "Verifies .github/workflows/agent-ci.yml triggers on PR and push, runs pytests, and executes ADK conformance checks.",
+      "file_to_check": ".github/workflows/agent-ci.yml",
+      "required_elements": [
+        "on:",
+        "pytest",
+        "run_adk_tests.py"
+      ],
+      "rubrics": [
+        {
+          "rubric_id": "rubric_github_actions_ci",
+          "description": "CI workflow must be properly structured to run on commits and pull requests.",
+          "type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "eval_id": "eval_infra_04_test_automation_coverage",
+      "name": "Pytest Suite & Conformance Automation",
+      "target_pillar": "Infrastructure & CI/CD",
+      "weight_points": 4,
+      "description": "Verifies that all 21 unit and integration test cases pass with 100% success rate.",
+      "min_passing_tests": 21,
+      "rubrics": [
+        {
+          "rubric_id": "rubric_test_pass_rate",
+          "description": "100% of test cases in tests/ must pass without failures or errors.",
+          "type": "BOOLEAN"
+        }
+      ]
+    }
+  ]
+}

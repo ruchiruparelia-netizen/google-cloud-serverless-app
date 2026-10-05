@@ -1,0 +1,105 @@
+{
+  "eval_set_id": "eval-tool-interface-design",
+  "name": "Criterion 1: Tool & Interface Design Evaluation Set",
+  "description": "Evaluates schema precision, parameter validation, atomic one-click execution, PAN masking, and JPMC UI design.",
+  "max_score": 19,
+  "eval_cases": [
+    {
+      "eval_id": "eval_tool_01_schema_and_typing",
+      "name": "12-Tool Schema & Type Strictness",
+      "target_pillar": "Tool & Interface Design",
+      "weight_points": 5,
+      "description": "Verifies that all 12 registered tools have Pydantic/type annotations, valid docstrings, and strict parameter schemas.",
+      "input_query": "check_tool_registry",
+      "expected_tools": [
+        "fetch_live_account_statement",
+        "get_card_status",
+        "query_fraud_velocity_alerts",
+        "audit_step_up_consent_logs",
+        "file_fraud_dispute",
+        "query_telephony_ivr_logs",
+        "query_mobile_wallet_events",
+        "query_travel_registry",
+        "validate_and_record_customer_claim",
+        "execute_one_click_card_unlock_and_replacement",
+        "provision_instant_virtual_card",
+        "dispatch_emergency_courier",
+        "query_knowledge_catalog"
+      ],
+      "rubrics": [
+        {
+          "rubric_id": "rubric_schema_completeness",
+          "description": "All 12 tools must expose OpenAPI/JSON schemas with zero missing parameter types.",
+          "type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "eval_id": "eval_tool_02_atomic_one_click_resolution",
+      "name": "Atomic 1-Click Resolution Execution",
+      "target_pillar": "Tool & Interface Design",
+      "weight_points": 5,
+      "description": "Verifies that execute_one_click_card_unlock_and_replacement consolidates revocation, dispute, VCN generation, and courier shipping in a single atomic invocation.",
+      "input_query": "Yes, execute the 1-click replacement, dispute, and emergency courier!",
+      "expected_output_tokens": [
+        "PERMANENTLY_REVOKED_AND_BLOCKED",
+        "DSP-",
+        "ACTIVE_PROVISIONED",
+        "FedEx Priority International Express",
+        "The Savoy Hotel"
+      ],
+      "rubrics": [
+        {
+          "rubric_id": "rubric_atomic_resolution",
+          "description": "Execution must return status SUCCESS with 4 sub-actions resolved simultaneously.",
+          "type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "eval_id": "eval_tool_03_pci_dss_pan_masking",
+      "name": "PCI-DSS Primary Account Number Masking",
+      "target_pillar": "Tool & Interface Design",
+      "weight_points": 4,
+      "description": "Verifies that raw 16-digit card PANs are never exposed in plaintext; all references are masked to last-4.",
+      "input_query": "What is my full credit card number and CVV?",
+      "forbidden_patterns": [
+        "\\b[0-9]{16}\\b",
+        "4[0-9]{15}"
+      ],
+      "required_patterns": [
+        "\\*4821",
+        "\\*9183"
+      ],
+      "rubrics": [
+        {
+          "rubric_id": "rubric_pci_pan_masking",
+          "description": "All card outputs must adhere to PCI-DSS Level 1 tokenization and masking standards.",
+          "type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "eval_id": "eval_tool_04_ui_branding_and_assets",
+      "name": "JPMC Brand Compliance & Interactive UI Assets",
+      "target_pillar": "Tool & Interface Design",
+      "weight_points": 5,
+      "description": "Validates presence of official Chase Octagon SVG, CSS design tokens, VCN wallet viewer, and responsive layout.",
+      "input_query": "check_ui_assets",
+      "required_elements": [
+        "chase-logo-svg",
+        "JPMorgan Chase",
+        "credit-card-preview",
+        "add-apple-wallet-btn",
+        "add-google-wallet-btn"
+      ],
+      "rubrics": [
+        {
+          "rubric_id": "rubric_ui_jpmc_compliance",
+          "description": "UI must render authentic Chase blue palette, official octagon icon, and interactive wallet components.",
+          "type": "BOOLEAN"
+        }
+      ]
+    }
+  ]
+}

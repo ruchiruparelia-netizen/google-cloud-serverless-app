@@ -1,0 +1,40 @@
+{
+  "eval_set_id": "eval-comprehensive-95-rubric",
+  "name": "JPMorgan Chase Agent Platform Comprehensive 95-Point Evaluation Set",
+  "description": "Consolidated evaluation set assessing the agent architecture across all 5 benchmark criteria (Total Maximum Score: 95).",
+  "max_score": 95,
+  "criteria_pillars": [
+    {
+      "pillar_id": "tool_interface_design",
+      "name": "Tool & Interface Design",
+      "max_score": 19,
+      "eval_set_ref": "eval_sets/eval_set_tool_interface_design.json"
+    },
+    {
+      "pillar_id": "context_memory",
+      "name": "Context & Memory",
+      "max_score": 19,
+      "eval_set_ref": "eval_sets/eval_set_context_memory.json"
+    },
+    {
+      "pillar_id": "orchestration_logic",
+      "name": "Orchestration & Logic",
+      "max_score": 19,
+      "eval_set_ref": "eval_sets/eval_set_orchestration_logic.json"
+    },
+    {
+      "pillar_id": "observability_tracing",
+      "name": "Observability & Tracing",
+      "max_score": 19,
+      "eval_set_ref": "eval_sets/eval_set_observability_tracing.json"
+    },
+    {
+      "pillar_id": "infrastructure_cicd",
+      "name": "Infrastructure & CI/CD",
+      "max_score": 19,
+      "eval_set_ref": "eval_sets/eval_set_infrastructure_cicd.json"
+    }
+  ],
+  "target_benchmark_score": 95,
+  "created_at": "2026-10-05T23:22:00Z"
+}

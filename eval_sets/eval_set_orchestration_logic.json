@@ -1,0 +1,95 @@
+{
+  "eval_set_id": "eval-orchestration-logic",
+  "name": "Criterion 3: Orchestration & Logic Evaluation Set",
+  "description": "Evaluates multi-agent mesh orchestration, zero-question root-cause diagnosis, sub-agent delegation, and regulatory compliance.",
+  "max_score": 19,
+  "eval_cases": [
+    {
+      "eval_id": "eval_orch_01_zero_question_synthesis",
+      "name": "Zero-Question Root Cause Synthesis",
+      "target_pillar": "Orchestration & Logic",
+      "weight_points": 5,
+      "description": "Verifies that agent never asks 'What is your card number?' or 'What happened?'; immediately synthesizes the multi-channel root cause.",
+      "user_query": "Why was my card declined at Target?",
+      "forbidden_questions": [
+        "What is your card number?",
+        "Can you tell me your card number?",
+        "Where are you currently located?",
+        "Can you explain what happened?"
+      ],
+      "required_synthesis_points": [
+        "Target Store #1142",
+        "SECURITY_LOCKED",
+        "New York",
+        "Chicago",
+        "1,000"
+      ],
+      "rubrics": [
+        {
+          "rubric_id": "rubric_zero_question_policy",
+          "description": "Agent must immediately deliver the root-cause narrative without asking repetitive diagnostic questions.",
+          "type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "eval_id": "eval_orch_02_multi_agent_mesh_coordination",
+      "name": "Multi-Agent Mesh Delegation Hierarchy",
+      "target_pillar": "Orchestration & Logic",
+      "weight_points": 5,
+      "description": "Verifies that Lead Synthesizer Orchestrator properly coordinates with Fraud Monitoring, Channel Telemetry, Claim Veracity, and Card Logistics sub-agents.",
+      "required_subagents": [
+        "fraud_monitoring_agent",
+        "channel_telemetry_agent",
+        "claim_veracity_validator_agent",
+        "card_replacement_logistics_agent"
+      ],
+      "rubrics": [
+        {
+          "rubric_id": "rubric_mesh_architecture",
+          "description": "All 4 sub-agents must be initialized with distinct system instructions, specialized tools, and transfer boundaries.",
+          "type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "eval_id": "eval_orch_03_overseas_wallet_theft_flow",
+      "name": "Overseas Stolen Wallet Emergency Flow",
+      "target_pillar": "Orchestration & Logic",
+      "weight_points": 5,
+      "description": "Verifies complete end-to-end resolution for London stolen wallet: blocks card *4821, provisions instant VCN for Apple Wallet, and dispatches FedEx to The Savoy Hotel.",
+      "user_query": "Someone just stole my wallet in London! Send replacement to my hotel immediately.",
+      "expected_actions": [
+        "ONE_CLICK_RESOLUTION"
+      ],
+      "expected_courier_destination": "The Savoy Hotel, Strand, London WC2R 0EZ, United Kingdom",
+      "rubrics": [
+        {
+          "rubric_id": "rubric_emergency_resolution",
+          "description": "Agent must atomically provision replacement card and courier logistics to the verified travel location.",
+          "type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "eval_id": "eval_orch_04_regulatory_compliance_and_tone",
+      "name": "Reg E / Reg Z Consumer Credit Compliance & Tone",
+      "target_pillar": "Orchestration & Logic",
+      "weight_points": 4,
+      "description": "Verifies empathetic tone, Zero Liability provisional credit disclosures, and dispute tracking under federal banking regulations.",
+      "user_query": "I didn't make the $1,000 charge in Chicago. Please dispute it.",
+      "expected_terms": [
+        "Zero Liability Policy",
+        "provisional credit",
+        "DSP-"
+      ],
+      "rubrics": [
+        {
+          "rubric_id": "rubric_regulatory_adherence",
+          "description": "Response must explicitly state provisional credit granted and provide a tracking case ID.",
+          "type": "BOOLEAN"
+        }
+      ]
+    }
+  ]
+}

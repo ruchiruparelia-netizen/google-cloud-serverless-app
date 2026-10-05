@@ -1,0 +1,80 @@
+{
+  "eval_set_id": "eval-observability-tracing",
+  "name": "Criterion 4: Observability & Tracing Evaluation Set",
+  "description": "Evaluates OpenTelemetry compliance, distributed tracing spans, latency performance, and audit trails.",
+  "max_score": 19,
+  "eval_cases": [
+    {
+      "eval_id": "eval_obs_01_opentelemetry_spans",
+      "name": "OpenTelemetry Granular Lifecycle Spans",
+      "target_pillar": "Observability & Tracing",
+      "weight_points": 5,
+      "description": "Verifies that all lifecycle actions emit structured spans with duration_ms, type, and details.",
+      "required_span_types": [
+        "PRELOAD_MEMORY_RECALL",
+        "VERACITY_AUDIT",
+        "TOOL_INVOCATION_START",
+        "TOOL_EXECUTION_COMPLETE",
+        "AGENT_SYNTHESIS_COMPLETE",
+        "ONE_CLICK_RESOLUTION_COMPLETE"
+      ],
+      "rubrics": [
+        {
+          "rubric_id": "rubric_otel_span_completeness",
+          "description": "Every major action must record an OTel-compliant span in the telemetry buffer.",
+          "type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "eval_id": "eval_obs_02_trace_propagation",
+      "name": "Distributed Trace Context Propagation",
+      "target_pillar": "Observability & Tracing",
+      "weight_points": 5,
+      "description": "Verifies that unique audit trace IDs are propagated across tool invocations, resolution records, and disputes.",
+      "expected_trace_prefix": "trace-jpmc-resolve-",
+      "rubrics": [
+        {
+          "rubric_id": "rubric_trace_id_linkage",
+          "description": "Atomic resolution result must contain a traceable audit_trace_id.",
+          "type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "eval_id": "eval_obs_03_latency_sla",
+      "name": "Execution Latency & Performance SLA",
+      "target_pillar": "Observability & Tracing",
+      "weight_points": 5,
+      "description": "Verifies that agent synthesis and tool execution complete well within the sub-second latency SLA (<500ms).",
+      "max_acceptable_latency_ms": 500.0,
+      "rubrics": [
+        {
+          "rubric_id": "rubric_latency_benchmark",
+          "description": "Agent turn execution must complete within 500ms under local testing.",
+          "type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "eval_id": "eval_obs_04_pii_pan_redaction",
+      "name": "Telemetry PII & PCI-DSS Audit Trail Redaction",
+      "target_pillar": "Observability & Tracing",
+      "weight_points": 4,
+      "description": "Verifies that telemetry spans, log files, and traces do not leak plain credit card PANs or customer passwords.",
+      "forbidden_telemetry_keys": [
+        "password",
+        "card_number_raw",
+        "full_pan",
+        "ssn"
+      ],
+      "rubrics": [
+        {
+          "rubric_id": "rubric_pii_safety",
+          "description": "Telemetry buffer must remain 100% free of unmasked sensitive payment or identity data.",
+          "type": "BOOLEAN"
+        }
+      ]
+    }
+  ]
+}

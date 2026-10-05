@@ -1,0 +1,94 @@
+{
+  "eval_set_id": "eval-context-memory",
+  "name": "Criterion 2: Context & Memory Evaluation Set",
+  "description": "Evaluates Vertex AI Scale Memory Bank integration, turn-start preloading, Dreaming Service compaction, and veracity gatekeeping.",
+  "max_score": 19,
+  "eval_cases": [
+    {
+      "eval_id": "eval_mem_01_turn_start_preload",
+      "name": "Turn-Start Memory Preloading (Zero-Latency Context)",
+      "target_pillar": "Context & Memory",
+      "weight_points": 5,
+      "description": "Verifies that Memory Bank preloads all multi-session customer context before turn execution, preventing context riots.",
+      "customer_id": "alex_morgan",
+      "expected_context_keys": [
+        "VERTEX AI MEMORY BANK PRELOAD",
+        "Chase Sapphire Preferred",
+        "SECURITY_LOCKED",
+        "The Savoy Hotel",
+        "Day 1 • 09:15 UTC"
+      ],
+      "rubrics": [
+        {
+          "rubric_id": "rubric_preload_presence",
+          "description": "Preload context must contain active card state, current lodging, and cross-channel timeline.",
+          "type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "eval_id": "eval_mem_02_episodic_channel_correlation",
+      "name": "Episodic Multi-Channel Context Integrity",
+      "target_pillar": "Context & Memory",
+      "weight_points": 5,
+      "description": "Verifies retention and correlation of disparate events: Fraud Velocity (Day 1 09:15), Telephony IVR (Day 1 14:32), Mobile Wallet (Day 2 11:20), and Travel Registry (Day 0).",
+      "customer_id": "alex_morgan",
+      "expected_channels": [
+        "FRAUD_DETECTION",
+        "TELEPHONY_IVR",
+        "MOBILE_APP",
+        "TRAVEL_REGISTRY"
+      ],
+      "rubrics": [
+        {
+          "rubric_id": "rubric_channel_integrity",
+          "description": "All 4 channel event records must be present and linked to customer profile.",
+          "type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "eval_id": "eval_mem_03_dreaming_compaction_efficiency",
+      "name": "Dreaming Service Compaction Tokenomics",
+      "target_pillar": "Context & Memory",
+      "weight_points": 5,
+      "description": "Verifies that background Dreaming Compaction reduces raw token footprint by >50% while maintaining 100% causal veracity.",
+      "customer_id": "alex_morgan",
+      "minimum_token_reduction_pct": 50.0,
+      "expected_compaction_status": "COMPACTED",
+      "rubrics": [
+        {
+          "rubric_id": "rubric_tokenomic_savings",
+          "description": "Compaction must consolidate multiple memory nodes into a single high-density node with verified token savings.",
+          "type": "BOOLEAN"
+        }
+      ]
+    },
+    {
+      "eval_id": "eval_mem_04_pre_write_veracity_gatekeeping",
+      "name": "Pre-Write Claim Veracity Gatekeeping",
+      "target_pillar": "Context & Memory",
+      "weight_points": 4,
+      "description": "Validates that customer assertions are cross-referenced against 5 ground-truth avenues before committing to memory.",
+      "claims_to_test": [
+        {
+          "claim": "Someone just stole my wallet in London!",
+          "expected_status": "VERIFIED_TRUE",
+          "min_confidence": 0.95
+        },
+        {
+          "claim": "I did not make the $1,000 charge in Chicago.",
+          "expected_status": "VERIFIED_TRUE",
+          "min_confidence": 0.95
+        }
+      ],
+      "rubrics": [
+        {
+          "rubric_id": "rubric_veracity_accuracy",
+          "description": "Corroborated claims must achieve >=95% confidence score with explicit telemetry proof points.",
+          "type": "BOOLEAN"
+        }
+      ]
+    }
+  ]
+}
