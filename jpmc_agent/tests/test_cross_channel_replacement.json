@@ -1,0 +1,16 @@
+{
+  "description": "Cross-channel card replacement and fraud mitigation session replay test for ADK CLI",
+  "events": [
+    {
+      "author": "user",
+      "content": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Why was my card declined at Target?"
+          }
+        ]
+      }
+    }
+  ]
+}

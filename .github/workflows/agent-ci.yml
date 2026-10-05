@@ -1,0 +1,35 @@
+name: JPMC Agent CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test-and-evaluate:
+    name: Agent Test Suite & Rubric Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Pytest Unit & Integration Tests
+        run: |
+          PYTHONPATH=. pytest tests/ -v
+
+      - name: Run ADK Conformance & Architecture Rubric Evaluation (Target: 95/95)
+        run: |
+          python run_adk_tests.py

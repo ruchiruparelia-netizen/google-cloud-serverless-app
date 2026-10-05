@@ -1,0 +1,61 @@
+# Google Cloud Build CI/CD Pipeline for JPMC Cross-Channel Credit Card & Fraud Mitigation Agent
+steps:
+  # Step 1: Install dependencies and run lint/pytest
+  - name: 'python:3.11-slim'
+    id: 'unit-tests-and-lint'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        pip install --no-cache-dir -r requirements.txt
+        PYTHONPATH=. pytest tests/ -v --disable-warnings
+
+  # Step 2: Run ADK local conformance runner
+  - name: 'python:3.11-slim'
+    id: 'adk-conformance-eval'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        pip install --no-cache-dir -r requirements.txt
+        python run_adk_tests.py
+
+  # Step 3: Build Docker Image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'docker-build'
+    args:
+      - 'build'
+      - '-t'
+      - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA'
+      - '-t'
+      - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/$_SERVICE_NAME:latest'
+      - '.'
+
+  # Step 4: Push to Google Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'docker-push'
+    args:
+      - 'push'
+      - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA'
+
+  # Step 5: Deploy to Serverless Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-cloud-run'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '$_SERVICE_NAME'
+      - '--image=$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA'
+      - '--region=$_REGION'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars=GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_REGION=$_REGION'
+
+substitutions:
+  _REGION: 'us-central1'
+  _REPO_NAME: 'jpmc-agents-repo'
+  _SERVICE_NAME: 'jpmc-card-fraud-agent'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
