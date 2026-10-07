@@ -92,10 +92,10 @@ Open **`http://127.0.0.1:8085`** to interact with the agent via the ADK Web deve
 
 ## Google Cloud Serverless Deployment
 
-Deploy directly to Google Cloud Serverless (Cloud Run):
+Deploy directly to Google Cloud Serverless (Cloud Run) for project `ruchi-agent-poc`:
 
 ```bash
-export GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
+export GOOGLE_CLOUD_PROJECT="ruchi-agent-poc"
 export GOOGLE_CLOUD_REGION="us-central1"
 ./deploy.sh
 ```
