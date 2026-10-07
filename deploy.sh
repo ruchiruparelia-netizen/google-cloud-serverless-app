@@ -47,35 +47,19 @@ if [ -n "${PROJECT_NUMBER}" ]; then
     --role="roles/storage.objectAdmin" --quiet 2>/dev/null || true
 fi
 
-# 3. Build & Deploy to Serverless Cloud Run
-echo "Step 2: Building container and deploying to Cloud Run..."
-if ! gcloud builds submit --tag "${IMAGE_NAME}" --project="${PROJECT_ID}"; then
-  echo "Cloud Build submit fallback: Deploying directly from source..."
-  gcloud run deploy "${SERVICE_NAME}" \
-    --source . \
-    --platform=managed \
-    --region="${REGION}" \
-    --allow-unauthenticated \
-    --memory=1Gi \
-    --cpu=1 \
-    --min-instances=0 \
-    --max-instances=10 \
-    --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_REGION=${REGION}" \
-    --project="${PROJECT_ID}"
-else
-  echo "Step 3: Deploying container to Cloud Run..."
-  gcloud run deploy "${SERVICE_NAME}" \
-    --image="${IMAGE_NAME}" \
-    --platform=managed \
-    --region="${REGION}" \
-    --allow-unauthenticated \
-    --memory=1Gi \
-    --cpu=1 \
-    --min-instances=0 \
-    --max-instances=10 \
-    --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_REGION=${REGION}" \
-    --project="${PROJECT_ID}"
-fi
+# 3. Build & Deploy to Serverless Cloud Run via Source (Artifact Registry)
+echo "Step 2: Deploying container directly from source to Cloud Run..."
+gcloud run deploy "${SERVICE_NAME}" \
+  --source . \
+  --platform=managed \
+  --region="${REGION}" \
+  --allow-unauthenticated \
+  --memory=1Gi \
+  --cpu=1 \
+  --min-instances=0 \
+  --max-instances=10 \
+  --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_REGION=${REGION}" \
+  --project="${PROJECT_ID}"
 
 SERVICE_URL=$(gcloud run services describe "${SERVICE_NAME}" --platform=managed --region="${REGION}" --format='value(status.url)' --project="${PROJECT_ID}")
 
