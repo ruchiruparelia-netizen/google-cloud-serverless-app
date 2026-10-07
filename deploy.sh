@@ -35,16 +35,18 @@ gcloud services enable \
   logging.googleapis.com \
   --project="${PROJECT_ID}"
 
-# Ensure service accounts have Cloud Storage permissions for Cloud Build staging
+# Ensure service accounts have Cloud Storage, Logging, and Artifact Registry permissions
 PROJECT_NUMBER=$(gcloud projects describe "${PROJECT_ID}" --format='value(projectNumber)' 2>/dev/null || echo "")
 if [ -n "${PROJECT_NUMBER}" ]; then
-  echo "Setting Cloud Storage permissions for project service accounts..."
-  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
-    --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
-    --role="roles/storage.objectAdmin" --quiet 2>/dev/null || true
-  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
-    --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
-    --role="roles/storage.objectAdmin" --quiet 2>/dev/null || true
+  echo "Setting IAM permissions (Logging, Storage, Artifact Registry) for project service accounts..."
+  for ROLE in "roles/logging.logWriter" "roles/storage.objectAdmin" "roles/artifactregistry.writer"; do
+    gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+      --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+      --role="${ROLE}" --quiet 2>/dev/null || true
+    gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+      --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
+      --role="${ROLE}" --quiet 2>/dev/null || true
+  done
 fi
 
 # 3. Build & Deploy to Serverless Cloud Run via Source (Artifact Registry)
