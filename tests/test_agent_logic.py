@@ -76,3 +76,16 @@ def test_telemetry_spans_endpoint():
     assert data["count"] > 0
     span_types = {s["type"] for s in data["spans"]}
     assert "PRELOAD_MEMORY_RECALL" in span_types
+
+
+def test_token_usage_summary_endpoint():
+    resp = client.get("/api/telemetry/tokens")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["cumulative_input_tokens"] > 0
+    assert data["cumulative_output_tokens"] > 0
+    assert data["total_tokens"] == data["cumulative_input_tokens"] + data["cumulative_output_tokens"]
+    assert "last_turn" in data
+    assert data["last_turn"]["input_tokens"] > 0
+    assert data["last_turn"]["output_tokens"] > 0
+

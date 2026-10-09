@@ -149,11 +149,110 @@ async def get_memories(customer_id: str = "alex_morgan"):
     }
 
 
+# Global Session Token Usage Tracker for Dashboard Telemetry
+TOKEN_USAGE_STATE: Dict[str, Any] = {
+    "model": "gemini-2.5-flash",
+    "turns_count": 1,
+    "cumulative_input_tokens": 482,
+    "cumulative_output_tokens": 146,
+    "total_tokens": 628,
+    "last_turn": {
+        "input_tokens": 482,
+        "output_tokens": 146,
+        "total_tokens": 628,
+        "system_instruction_tokens": 265,
+        "memory_preload_tokens": 198,
+        "user_prompt_tokens": 19,
+        "tool_calls_tokens": 0,
+    },
+    "dreaming_compaction": {
+        "is_compacted": False,
+        "tokens_saved": 0,
+        "reduction_percentage": "0.0%",
+    },
+    "estimated_cost_usd": 0.00016,
+}
+
+
+def reset_token_usage_state() -> None:
+    """Resets token usage metrics to initial turn-start preload baseline."""
+    TOKEN_USAGE_STATE.update({
+        "model": "gemini-2.5-flash",
+        "turns_count": 1,
+        "cumulative_input_tokens": 482,
+        "cumulative_output_tokens": 146,
+        "total_tokens": 628,
+        "last_turn": {
+            "input_tokens": 482,
+            "output_tokens": 146,
+            "total_tokens": 628,
+            "system_instruction_tokens": 265,
+            "memory_preload_tokens": 198,
+            "user_prompt_tokens": 19,
+            "tool_calls_tokens": 0,
+        },
+        "dreaming_compaction": {
+            "is_compacted": False,
+            "tokens_saved": 0,
+            "reduction_percentage": "0.0%",
+        },
+        "estimated_cost_usd": 0.00016,
+    })
+
+
+def record_turn_token_usage(
+    user_msg: str,
+    preload_ctx: str,
+    reply_text: str,
+    tool_Executions: int = 0,
+) -> Dict[str, Any]:
+    """Calculates and records input and output token usage for an agent turn."""
+    sys_tokens = 265
+    mem_tokens = max(1, len(preload_ctx) // 4)
+    user_tokens = max(1, len(user_msg) // 4)
+    tool_in_tokens = tool_Executions * 48
+
+    turn_input_tokens = sys_tokens + mem_tokens + user_tokens + tool_in_tokens
+    reply_tokens = max(1, len(reply_text) // 4)
+    tool_out_tokens = tool_Executions * 36
+    turn_output_tokens = reply_tokens + tool_out_tokens
+    turn_total_tokens = turn_input_tokens + turn_output_tokens
+
+    TOKEN_USAGE_STATE["turns_count"] += 1
+    TOKEN_USAGE_STATE["cumulative_input_tokens"] += turn_input_tokens
+    TOKEN_USAGE_STATE["cumulative_output_tokens"] += turn_output_tokens
+    TOKEN_USAGE_STATE["total_tokens"] = (
+        TOKEN_USAGE_STATE["cumulative_input_tokens"]
+        + TOKEN_USAGE_STATE["cumulative_output_tokens"]
+    )
+    TOKEN_USAGE_STATE["last_turn"] = {
+        "input_tokens": turn_input_tokens,
+        "output_tokens": turn_output_tokens,
+        "total_tokens": turn_total_tokens,
+        "system_instruction_tokens": sys_tokens,
+        "memory_preload_tokens": mem_tokens,
+        "user_prompt_tokens": user_tokens,
+        "tool_calls_tokens": tool_in_tokens + tool_out_tokens,
+    }
+    # Gemini 2.5 Flash pricing estimation ($0.15/1M input, $0.60/1M output)
+    cost = (
+        (TOKEN_USAGE_STATE["cumulative_input_tokens"] * 0.00000015)
+        + (TOKEN_USAGE_STATE["cumulative_output_tokens"] * 0.00000060)
+    )
+    TOKEN_USAGE_STATE["estimated_cost_usd"] = round(cost, 6)
+    return dict(TOKEN_USAGE_STATE)
+
+
 @app.post("/api/memory/seed")
 async def seed_memories(customer_id: str = "alex_morgan"):
     """Resets customer memory bank to standard cross-channel scenario state."""
     memory_bank_store.seed_defaults()
-    return {"status": "SUCCESS", "message": f"Memory Bank re-seeded for {customer_id}"}
+    reset_token_usage_state()
+    return {
+        "status": "SUCCESS",
+        "message": f"Memory Bank re-seeded for {customer_id}",
+        "token_usage": TOKEN_USAGE_STATE,
+    }
 
 
 @app.post("/api/memory/compact")
@@ -162,6 +261,15 @@ async def compact_memories(customer_id: str = "alex_morgan"):
     start_time = time.time()
     result = DreamingCompactionService.compact_customer_memories(customer_id)
     duration_ms = (time.time() - start_time) * 1000
+    if result.get("status") == "COMPACTED":
+        saved = max(0, result.get("raw_token_count", 0) - result.get("compacted_token_count", 0))
+        TOKEN_USAGE_STATE["dreaming_compaction"] = {
+            "is_compacted": True,
+            "tokens_saved": saved,
+            "reduction_percentage": result.get("token_reduction_percentage", "66.0%"),
+        }
+        TOKEN_USAGE_STATE["last_turn"]["memory_preload_tokens"] = result.get("compacted_token_count", 68)
+    result["token_usage"] = TOKEN_USAGE_STATE
     record_telemetry_span(
         span_type="DREAMING_COMPACTION_COMPLETE",
         name="DreamingCompactionService",
@@ -219,7 +327,17 @@ async def execute_resolution(req: CardActionRequest):
 @app.get("/api/telemetry/spans")
 async def get_telemetry():
     """Returns recent OpenTelemetry-compliant execution spans."""
-    return {"count": len(GLOBAL_TELEMETRY_SPANS), "spans": list(reversed(GLOBAL_TELEMETRY_SPANS))}
+    return {
+        "count": len(GLOBAL_TELEMETRY_SPANS),
+        "spans": list(reversed(GLOBAL_TELEMETRY_SPANS)),
+        "token_usage": TOKEN_USAGE_STATE,
+    }
+
+
+@app.get("/api/telemetry/tokens")
+async def get_token_usage():
+    """Returns live input and output token usage summary for the dashboard."""
+    return TOKEN_USAGE_STATE
 
 
 @app.get("/api/rubric/scores")
@@ -403,6 +521,14 @@ async def chat_endpoint(req: ChatRequest):
             f"How would you like me to help you today?"
         )
 
+    tool_exec_count = (1 if veracity_audit else 0) + (2 if action_executed == "ONE_CLICK_RESOLUTION" else (1 if action_executed else 0))
+    token_usage = record_turn_token_usage(
+        user_msg=user_msg,
+        preload_ctx=preload_ctx,
+        reply_text=reply_text,
+        tool_Executions=tool_exec_count,
+    )
+
     duration_ms = (time.time() - start_time) * 1000
     record_telemetry_span(
         span_type="AGENT_SYNTHESIS_COMPLETE",
@@ -411,6 +537,9 @@ async def chat_endpoint(req: ChatRequest):
             "customer_id": req.customer_id,
             "action_executed": action_executed,
             "reply_length": len(reply_text),
+            "input_tokens": token_usage["last_turn"]["input_tokens"],
+            "output_tokens": token_usage["last_turn"]["output_tokens"],
+            "total_tokens": token_usage["last_turn"]["total_tokens"],
         },
         duration_ms=duration_ms,
     )
@@ -422,6 +551,7 @@ async def chat_endpoint(req: ChatRequest):
         "veracity_audit": veracity_audit,
         "customer": DEFAULT_CUSTOMER,
         "latency_ms": round(duration_ms, 2),
+        "token_usage": token_usage,
     }
 
 

@@ -44,6 +44,10 @@
                 <span class="status-dot blue pulse"></span>
                 <span>OTel Tracing: <strong>Active</strong></span>
             </button>
+            <div class="telemetry-pill token-telemetry-pill" id="header-token-pill" title="Live Gemini Input & Output Token Usage">
+                <span class="status-dot green pulse"></span>
+                <span>Tokens: <strong id="nav-token-in">482</strong> In • <strong id="nav-token-out">146</strong> Out</span>
+            </div>
             <div class="telemetry-pill">
                 <span class="status-dot green pulse"></span>
                 <span>Memory Bank: <strong>Synchronized</strong></span>
@@ -193,6 +197,12 @@
                             Our Scale Memory Bank indicates your card was automatically restricted following concurrent geo-velocity logins in New York and Chicago, a declined transaction at Target, and a dropped phone verification. I am equipped to execute an <strong>instant 1-click card replacement</strong>, dispute unauthorized charges, provision a <strong>Digital Virtual Card (VCN)</strong> directly into your mobile wallet, and dispatch emergency plastic to your hotel in London.<br><br>
                             How would you like to proceed?
                         </div>
+                        <div class="msg-token-footer">
+                            <span class="tok-chip in">⬆ Input: <strong>482 tok</strong> (Preload: 198 tok)</span>
+                            <span class="tok-chip out">⬇ Output: <strong>146 tok</strong></span>
+                            <span class="tok-chip total">∑ Total: <strong>628 tok</strong></span>
+                            <span class="tok-chip latency">⚡ 12.4 ms</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -290,6 +300,65 @@
                     <div class="info-row">
                         <span class="k">Shipping Status:</span>
                         <span class="v" id="shipping-status-val"><span class="badge yellow">Awaiting Trigger</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Token Usage Summary Card -->
+            <div class="token-summary-card" id="token-usage-card">
+                <div class="token-summary-header">
+                    <div class="token-title-group">
+                        <span class="token-icon">📊</span>
+                        <div>
+                            <h3>Token Usage Summary</h3>
+                            <p class="token-sub">Gemini 2.5 Flash • Scale Memory Telemetry</p>
+                        </div>
+                    </div>
+                    <span class="turn-badge" id="token-turn-badge">Turn #1</span>
+                </div>
+
+                <div class="token-kpi-grid">
+                    <div class="token-kpi-box input-kpi">
+                        <span class="kpi-label">INPUT TOKENS</span>
+                        <span class="kpi-value" id="summary-input-tokens">482</span>
+                        <span class="kpi-sub" id="last-turn-input">+482 last turn</span>
+                    </div>
+                    <div class="token-kpi-box output-kpi">
+                        <span class="kpi-label">OUTPUT TOKENS</span>
+                        <span class="kpi-value" id="summary-output-tokens">146</span>
+                        <span class="kpi-sub" id="last-turn-output">+146 last turn</span>
+                    </div>
+                    <div class="token-kpi-box total-kpi">
+                        <span class="kpi-label">TOTAL TOKENS</span>
+                        <span class="kpi-value" id="summary-total-tokens">628</span>
+                        <span class="kpi-sub" id="summary-est-cost">Est: $0.00016</span>
+                    </div>
+                </div>
+
+                <!-- Visual Input vs Output Ratio Bar -->
+                <div class="token-ratio-wrap">
+                    <div class="token-ratio-labels">
+                        <span id="input-pct-label">Input: 76.8%</span>
+                        <span id="output-pct-label">Output: 23.2%</span>
+                    </div>
+                    <div class="token-ratio-bar">
+                        <div class="ratio-fill-input" id="ratio-bar-input" style="width: 76.8%;"></div>
+                        <div class="ratio-fill-output" id="ratio-bar-output" style="width: 23.2%;"></div>
+                    </div>
+                </div>
+
+                <div class="token-breakdown-rows">
+                    <div class="info-row">
+                        <span class="k">System &amp; Prompt Context:</span>
+                        <span class="v" id="sys-prompt-tokens-val">284 tok</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="k">Memory Bank Preload:</span>
+                        <span class="v text-cyan" id="memory-preload-tokens-val">198 tok</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="k">Dreaming Token Savings:</span>
+                        <span class="v text-green" id="dreaming-savings-val">0.0% (Uncompacted)</span>
                     </div>
                 </div>
             </div>

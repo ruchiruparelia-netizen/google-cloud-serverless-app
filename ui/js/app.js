@@ -51,6 +51,24 @@ class JPMCAgentApp {
         this.testVeracityBtn = document.getElementById('test-veracity-btn');
         this.veracityInput = document.getElementById('veracity-input');
         this.veracityResultBox = document.getElementById('veracity-result-box');
+
+        // Token Usage Summary elements
+        this.navTokenIn = document.getElementById('nav-token-in');
+        this.navTokenOut = document.getElementById('nav-token-out');
+        this.tokenTurnBadge = document.getElementById('token-turn-badge');
+        this.summaryInputTokens = document.getElementById('summary-input-tokens');
+        this.summaryOutputTokens = document.getElementById('summary-output-tokens');
+        this.summaryTotalTokens = document.getElementById('summary-total-tokens');
+        this.lastTurnInput = document.getElementById('last-turn-input');
+        this.lastTurnOutput = document.getElementById('last-turn-output');
+        this.summaryEstCost = document.getElementById('summary-est-cost');
+        this.inputPctLabel = document.getElementById('input-pct-label');
+        this.outputPctLabel = document.getElementById('output-pct-label');
+        this.ratioBarInput = document.getElementById('ratio-bar-input');
+        this.ratioBarOutput = document.getElementById('ratio-bar-output');
+        this.sysPromptTokensVal = document.getElementById('sys-prompt-tokens-val');
+        this.memoryPreloadTokensVal = document.getElementById('memory-preload-tokens-val');
+        this.dreamingSavingsVal = document.getElementById('dreaming-savings-val');
     }
 
     bindEvents() {
@@ -115,8 +133,66 @@ class JPMCAgentApp {
         });
     }
 
-    loadInitialData() {
+    async loadInitialData() {
         console.log('JPMC Agent App initialized for customer: ' + this.customerId);
+        try {
+            const resp = await fetch('/api/telemetry/tokens');
+            if (resp.ok) {
+                const tokenUsage = await resp.json();
+                this.updateTokenUsageUI(tokenUsage);
+            }
+        } catch (err) {
+            console.warn('Could not fetch initial token telemetry:', err);
+        }
+    }
+
+    updateTokenUsageUI(usage) {
+        if (!usage) return;
+        const inTok = usage.cumulative_input_tokens || 0;
+        const outTok = usage.cumulative_output_tokens || 0;
+        const totalTok = usage.total_tokens || (inTok + outTok) || 1;
+        const last = usage.last_turn || {};
+
+        if (this.navTokenIn) this.navTokenIn.textContent = inTok.toLocaleString();
+        if (this.navTokenOut) this.navTokenOut.textContent = outTok.toLocaleString();
+        if (this.tokenTurnBadge) this.tokenTurnBadge.textContent = `Turn #${usage.turns_count || 1}`;
+
+        if (this.summaryInputTokens) this.summaryInputTokens.textContent = inTok.toLocaleString();
+        if (this.summaryOutputTokens) this.summaryOutputTokens.textContent = outTok.toLocaleString();
+        if (this.summaryTotalTokens) this.summaryTotalTokens.textContent = totalTok.toLocaleString();
+
+        if (this.lastTurnInput && last.input_tokens !== undefined) {
+            this.lastTurnInput.textContent = `+${last.input_tokens.toLocaleString()} last turn`;
+        }
+        if (this.lastTurnOutput && last.output_tokens !== undefined) {
+            this.lastTurnOutput.textContent = `+${last.output_tokens.toLocaleString()} last turn`;
+        }
+        if (this.summaryEstCost && usage.estimated_cost_usd !== undefined) {
+            this.summaryEstCost.textContent = `Est: $${Number(usage.estimated_cost_usd).toFixed(5)}`;
+        }
+
+        const inPct = ((inTok / totalTok) * 100).toFixed(1);
+        const outPct = (100 - parseFloat(inPct)).toFixed(1);
+        if (this.inputPctLabel) this.inputPctLabel.textContent = `Input: ${inPct}%`;
+        if (this.outputPctLabel) this.outputPctLabel.textContent = `Output: ${outPct}%`;
+        if (this.ratioBarInput) this.ratioBarInput.style.width = `${inPct}%`;
+        if (this.ratioBarOutput) this.ratioBarOutput.style.width = `${outPct}%`;
+
+        if (this.sysPromptTokensVal && last.system_instruction_tokens !== undefined) {
+            const promptSum = (last.system_instruction_tokens || 0) + (last.user_prompt_tokens || 0);
+            this.sysPromptTokensVal.textContent = `${promptSum.toLocaleString()} tok`;
+        }
+        if (this.memoryPreloadTokensVal && last.memory_preload_tokens !== undefined) {
+            this.memoryPreloadTokensVal.textContent = `${last.memory_preload_tokens.toLocaleString()} tok`;
+        }
+        if (this.dreamingSavingsVal && usage.dreaming_compaction) {
+            const dc = usage.dreaming_compaction;
+            if (dc.is_compacted) {
+                this.dreamingSavingsVal.textContent = `${dc.reduction_percentage} (-${dc.tokens_saved} tok/turn)`;
+            } else {
+                this.dreamingSavingsVal.textContent = `0.0% (Uncompacted)`;
+            }
+        }
     }
 
     async handleSendMessage() {
@@ -139,8 +215,13 @@ class JPMCAgentApp {
             const data = await resp.json();
             typingEl.remove();
 
-            // Render agent reply
-            this.appendMessage('agent', data.reply);
+            // Render agent reply with per-turn token usage badge
+            this.appendMessage('agent', data.reply, data.token_usage, data.latency_ms);
+
+            // Update dashboard token usage summary card & top nav bar
+            if (data.token_usage) {
+                this.updateTokenUsageUI(data.token_usage);
+            }
 
             // Handle actions if resolution or VCN occurred
             if (data.action_executed === 'ONE_CLICK_RESOLUTION') {
@@ -192,6 +273,9 @@ class JPMCAgentApp {
         try {
             const resp = await fetch(`/api/memory/compact?customer_id=${this.customerId}`, { method: 'POST' });
             const data = await resp.json();
+            if (data.token_usage) {
+                this.updateTokenUsageUI(data.token_usage);
+            }
             alert(`🧠 Dreaming Service Compaction Succeeded!\n\n` +
                   `• Raw Memory Tokens: ${data.raw_token_count}\n` +
                   `• Compacted Tokens: ${data.compacted_token_count}\n` +
@@ -329,7 +413,7 @@ class JPMCAgentApp {
         }
     }
 
-    appendMessage(role, text) {
+    appendMessage(role, text, tokenUsage = null, latencyMs = null) {
         const row = document.createElement('div');
         row.className = `message-row ${role}-row`;
 
@@ -353,6 +437,20 @@ class JPMCAgentApp {
 
         bubble.appendChild(header);
         bubble.appendChild(body);
+
+        if (role === 'agent' && tokenUsage && tokenUsage.last_turn) {
+            const lt = tokenUsage.last_turn;
+            const footer = document.createElement('div');
+            footer.className = 'msg-token-footer';
+            footer.innerHTML = `
+                <span class="tok-chip in">⬆ Input: <strong>${lt.input_tokens} tok</strong> (Preload: ${lt.memory_preload_tokens} tok)</span>
+                <span class="tok-chip out">⬇ Output: <strong>${lt.output_tokens} tok</strong></span>
+                <span class="tok-chip total">∑ Turn: <strong>${lt.total_tokens} tok</strong></span>
+                ${latencyMs !== null ? `<span class="tok-chip latency">⚡ ${latencyMs} ms</span>` : ''}
+            `;
+            bubble.appendChild(footer);
+        }
+
         row.appendChild(avatar);
         row.appendChild(bubble);
 
