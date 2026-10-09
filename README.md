@@ -46,15 +46,15 @@ See full detailed analysis in [architecture_evaluation.md](file:///Users/ruchiru
 
 ---
 
-## Multi-Agent Mesh Roster
+## Multi-Agent Mesh & Strategic Model Routing
 
-| Agent Name | Role | Responsibilities |
-| :--- | :--- | :--- |
-| **`consumer_credit_synthesizer_agent`** | **Lead Synthesizer Orchestrator** | Root coordinator; synthesizes cross-channel timelines; drives zero-question resolution. |
-| **`fraud_monitoring_agent`** | **Fraud Velocity Specialist** | Audits geo-velocity alerts (NY vs. Chicago 9-min anomaly) and 2FA SMS consent logs. |
-| **`channel_telemetry_agent`** | **Cross-Channel Specialist** | Correlates IVR telephony CDRs (dropped calls) and mobile wallet token errors. |
-| **`claim_veracity_validator_agent`** | **5-Avenue Veracity Gatekeeper** | Validates claims against Ledger, Travel Registry, Baseline, SMS Logs, and Policies. |
-| **`card_replacement_logistics_agent`**| **Card Ops & Logistics Specialist**| Provisions instant Digital VCNs and dispatches FedEx Priority International couriers. |
+| Agent Name | Role | Routed Model Tier | Responsibilities & HITL Guardrails |
+| :--- | :--- | :--- | :--- |
+| **`consumer_credit_synthesizer_agent`** | **Lead Synthesizer Orchestrator** | `gemini-2.5-pro` | Root coordinator; synthesizes cross-channel timelines; drives zero-question resolution; enforces HITL code stops. |
+| **`claim_veracity_validator_agent`** | **5-Avenue Veracity Gatekeeper** | `gemini-2.5-pro` | Validates claims against Ledger, Travel Registry, Baseline, SMS Logs, and Policies; escalates confidence `< 0.80` to HITL. |
+| **`fraud_monitoring_agent`** | **Fraud Velocity Specialist** | `gemini-2.5-flash` | Sub-second geo-velocity audits (NY vs. Chicago 9-min anomaly); programmatic HITL stop on disputes `> $2,500`. |
+| **`card_replacement_logistics_agent`**| **Card Ops & Logistics Specialist**| `gemini-2.5-flash` | Provisions instant Digital VCNs and dispatches FedEx Priority International couriers; HITL stop on unapproved revocations. |
+| **`channel_telemetry_agent`** | **Cross-Channel Specialist** | `gemini-2.5-flash-lite` | High-throughput, low-cost correlation of IVR telephony CDRs (dropped calls) and mobile wallet token errors. |
 
 ---
 
@@ -90,12 +90,27 @@ Open **`http://127.0.0.1:8085`** to interact with the agent via the ADK Web deve
 
 ---
 
-## Google Cloud Serverless Deployment
+## Declarative Infrastructure-as-Code (Terraform & Knative)
 
-Deploy directly to Google Cloud Serverless (Cloud Run) for project `ruchi-agent-poc`:
+### Option A: Provision via Terraform (`terraform/`)
+Full declarative Terraform configurations are provided in [`terraform/main.tf`](file:///Users/ruchiruparelia/agy2-projects/google-cloud-serverless-app/terraform/main.tf), [`terraform/variables.tf`](file:///Users/ruchiruparelia/agy2-projects/google-cloud-serverless-app/terraform/variables.tf), and [`terraform/outputs.tf`](file:///Users/ruchiruparelia/agy2-projects/google-cloud-serverless-app/terraform/outputs.tf):
 
+```bash
+cd terraform
+terraform init
+terraform plan -var="project_id=ruchi-agent-poc" -var="region=us-central1"
+terraform apply -var="project_id=ruchi-agent-poc" -var="region=us-central1" -auto-approve
+```
+
+### Option B: Declarative Cloud Run Service Manifest (`deployment.yaml`)
+```bash
+gcloud run services replace deployment.yaml --region=us-central1 --project=ruchi-agent-poc
+```
+
+### Option C: Automated Cloud Run Script (`deploy.sh`)
 ```bash
 export GOOGLE_CLOUD_PROJECT="ruchi-agent-poc"
 export GOOGLE_CLOUD_REGION="us-central1"
 ./deploy.sh
 ```
+

@@ -8,6 +8,7 @@ from .card_ops_tools import (
     execute_one_click_card_unlock_and_replacement,
     provision_instant_virtual_card,
     dispatch_emergency_courier,
+    request_human_in_the_loop_approval,
 )
 from .knowledge_tools import query_knowledge_catalog
 
@@ -24,5 +25,7 @@ __all__ = [
     "execute_one_click_card_unlock_and_replacement",
     "provision_instant_virtual_card",
     "dispatch_emergency_courier",
+    "request_human_in_the_loop_approval",
     "query_knowledge_catalog",
 ]
+

@@ -78,6 +78,37 @@ class AuditTraceSpan(BaseModel):
     span_id: str
     agent_name: str
     action_type: str  # PRELOAD_MEMORY, VERACITY_AUDIT, TOOL_EXECUTION, SYNTHESIS, COMPACTION
-    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     latency_ms: float
     details: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ToolErrorRecoveryResponse(BaseModel):
+    """Structured guided error payload returned to the LLM when a tool encounters an exception."""
+    status: str = "ERROR"
+    tool_name: str
+    error_type: str
+    error_message: str
+    retryable: bool = True
+    fallback_tool: Optional[str] = None
+    llm_recovery_instructions: str = Field(
+        description="Actionable recovery steps instructing the LLM how to self-correct parameters, invoke a fallback tool, or ask the customer for clarification."
+    )
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
+class HumanInTheLoopInterrupt(BaseModel):
+    """Programmatic Human-in-the-Loop (HITL) code stop payload for high-stakes banking actions."""
+    status: str = "HITL_APPROVAL_REQUIRED"
+    interrupt_id: str
+    action_name: str
+    risk_level: str = "HIGH_STAKES_FINANCIAL_ACTION"
+    reason: str
+    proposed_arguments: Dict[str, Any] = Field(default_factory=dict)
+    approval_instructions: str
+    llm_guidance: str = (
+        "EXECUTION HALTED BY PROGRAMMATIC HITL GATE: Do NOT proceed with this action until explicit "
+        "human/supervisor approval is confirmed (`human_approved=True` or `hitl_confirmation_token` provided)."
+    )
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+

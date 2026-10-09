@@ -113,3 +113,63 @@ def test_execute_one_click_card_unlock_and_replacement():
     assert res["virtual_card"]["status"] == "ACTIVE_PROVISIONED"
     assert res["emergency_courier"]["status"] == "DISPATCHED_TO_COURIER"
     assert len(res["updated_billers_notified"]) >= 4
+
+
+def test_guided_error_handling_and_llm_recovery_instructions():
+    """Verifies that invalid tool inputs return structured error payloads with LLM recovery instructions instead of crashing."""
+    err_acct = fetch_live_account_statement("")
+    assert err_acct["status"] == "ERROR"
+    assert "RECOVERY GUIDANCE" in err_acct["llm_recovery_instructions"]
+
+    err_card = get_card_status("invalid-pan")
+    assert err_card["status"] == "ERROR"
+    assert "RECOVERY GUIDANCE" in err_card["llm_recovery_instructions"]
+
+    err_disp = file_fraud_dispute("", -10.0, "")
+    assert err_disp["status"] == "ERROR"
+    assert "RECOVERY GUIDANCE" in err_disp["llm_recovery_instructions"]
+
+    err_claim = validate_and_record_customer_claim("alex_morgan", "")
+    assert err_claim["status"] == "ERROR"
+    assert "RECOVERY GUIDANCE" in err_claim["llm_recovery_instructions"]
+
+    err_kb = query_knowledge_catalog("")
+    assert err_kb["status"] == "ERROR"
+    assert "RECOVERY GUIDANCE" in err_kb["llm_recovery_instructions"]
+
+
+def test_programmatic_hitl_code_stops_for_high_stakes_actions():
+    """Verifies programmatic Human-in-the-Loop (HITL) code stops halt execution when thresholds are exceeded or unapproved."""
+    # High-value dispute > $2,500 without confirmation token must halt with HITL_APPROVAL_REQUIRED
+    hitl_disp = file_fraud_dispute("tx-high-9999", 5000.00, "Unknown Wire Transfer")
+    assert hitl_disp["status"] == "HITL_APPROVAL_REQUIRED"
+    assert "EXECUTION HALTED BY PROGRAMMATIC HITL GATE" in hitl_disp["llm_guidance"]
+
+    # Unapproved 1-click permanent card revocation must halt with HITL_APPROVAL_REQUIRED
+    hitl_1click = execute_one_click_card_unlock_and_replacement("alex_morgan", human_approved=False)
+    assert hitl_1click["status"] == "HITL_APPROVAL_REQUIRED"
+    assert hitl_1click["action_name"] == "execute_one_click_card_unlock_and_replacement"
+
+
+def test_strategic_multi_model_routing():
+    """Verifies that the 5 agents are strategically routed across Pro, Flash, and Flash-Lite tiers."""
+    from jpmc_agent.agent import (
+        root_agent,
+        claim_veracity_validator_agent,
+        fraud_monitoring_agent,
+        card_replacement_logistics_agent,
+        channel_telemetry_agent,
+        StrategicModelRouter,
+    )
+    from jpmc_agent.config import REASONING_PRO_MODEL, FAST_FLASH_MODEL, LITE_TELEMETRY_MODEL
+
+    assert root_agent.model == REASONING_PRO_MODEL
+    assert claim_veracity_validator_agent.model == REASONING_PRO_MODEL
+    assert fraud_monitoring_agent.model == FAST_FLASH_MODEL
+    assert card_replacement_logistics_agent.model == FAST_FLASH_MODEL
+    assert channel_telemetry_agent.model == LITE_TELEMETRY_MODEL
+
+    assert StrategicModelRouter.select_model_for_task("SYNTHESIS", risk_score=92) == REASONING_PRO_MODEL
+    assert StrategicModelRouter.select_model_for_task("TELEMETRY_INGESTION", risk_score=10) == LITE_TELEMETRY_MODEL
+    assert StrategicModelRouter.select_model_for_task("CARD_OPS", risk_score=40) == FAST_FLASH_MODEL
+

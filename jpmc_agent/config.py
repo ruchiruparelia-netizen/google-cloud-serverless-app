@@ -3,10 +3,31 @@
 import os
 from typing import Dict, Any
 
-# Primary Model Configuration
-DEFAULT_MODEL = os.getenv("JPMC_AGENT_MODEL", "gemini-3.8-flash")
-FALLBACK_MODEL = "gemini-3.5-flash"
-GCP_PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "jpmc-consumer-credit-sandbox")
+# Strategic Multi-Model Routing Configuration (Cost, Latency & Reasoning Tiering)
+# 1. Pro Model: High-complexity causal reasoning, multi-agent synthesis, & 5-avenue veracity gatekeeping
+REASONING_PRO_MODEL = os.getenv("JPMC_REASONING_PRO_MODEL", "gemini-2.5-pro")
+# 2. Flash Model: Sub-second real-time fraud velocity detection & atomic card replacement execution
+FAST_FLASH_MODEL = os.getenv("JPMC_FAST_FLASH_MODEL", "gemini-2.5-flash")
+# 3. Flash-Lite Model: High-throughput, low-cost channel telemetry parsing (IVR CDRs, wallet logs)
+LITE_TELEMETRY_MODEL = os.getenv("JPMC_LITE_TELEMETRY_MODEL", "gemini-2.5-flash-lite")
+
+DEFAULT_MODEL = os.getenv("JPMC_AGENT_MODEL", REASONING_PRO_MODEL)
+FALLBACK_MODEL = FAST_FLASH_MODEL
+
+MODEL_ROUTING_TABLE: Dict[str, str] = {
+    "consumer_credit_synthesizer_agent": REASONING_PRO_MODEL,
+    "claim_veracity_validator_agent": REASONING_PRO_MODEL,
+    "fraud_monitoring_agent": FAST_FLASH_MODEL,
+    "card_replacement_logistics_agent": FAST_FLASH_MODEL,
+    "channel_telemetry_agent": LITE_TELEMETRY_MODEL,
+}
+
+# Human-in-the-Loop (HITL) Programmatic Code Stop Thresholds for High-Stakes Actions
+HITL_HIGH_VALUE_DISPUTE_THRESHOLD_USD = float(os.getenv("HITL_DISPUTE_THRESHOLD_USD", "2500.00"))
+HITL_HIGH_SPENDING_LIMIT_THRESHOLD_USD = float(os.getenv("HITL_VCN_LIMIT_THRESHOLD_USD", "25000.00"))
+HITL_LOW_VERACITY_CONFIDENCE_THRESHOLD = float(os.getenv("HITL_VERACITY_THRESHOLD", "0.80"))
+
+GCP_PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "ruchi-agent-poc")
 GCP_REGION = os.getenv("GOOGLE_CLOUD_REGION", "us-central1")
 
 # Vertex AI Agent Platform & Memory Bank Resource Config
