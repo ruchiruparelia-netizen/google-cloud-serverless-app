@@ -1,11 +1,12 @@
 """Knowledge Catalog retrieval tool for JPMC governance and banking policies."""
 
-import logging
 from typing import Dict, Any, List
+import structlog
 from ..config import KNOWLEDGE_CATALOG_CORPUS
 from ..models import ToolErrorRecoveryResponse
+from ..observability import get_structured_logger
 
-logger = logging.getLogger("jpmc_agent.tools.knowledge")
+logger = get_structured_logger("jpmc_agent.tools.knowledge")
 
 
 def query_knowledge_catalog(query: str) -> Dict[str, Any]:
@@ -78,14 +79,27 @@ def query_knowledge_catalog(query: str) -> Dict[str, Any]:
             ):
                 matched.append(p)
 
+        selected = matched if matched else policies[:2]
+        logger.info(
+            "knowledge_catalog_queried",
+            tool_name="query_knowledge_catalog",
+            query=query,
+            matched_count=len(selected),
+            corpus_id=KNOWLEDGE_CATALOG_CORPUS,
+        )
         return {
             "query": query,
-            "matched_policies": matched if matched else policies[:2],
+            "matched_policies": selected,
             "corpus_id": KNOWLEDGE_CATALOG_CORPUS,
             "retrieval_status": "SUCCESS",
         }
     except ValueError as exc:
-        logger.warning("Invalid query in query_knowledge_catalog: %s", exc)
+        logger.warning(
+            "tool_validation_error",
+            tool_name="query_knowledge_catalog",
+            error_type="EmptyPolicyQuery",
+            error=str(exc),
+        )
         return ToolErrorRecoveryResponse(
             tool_name="query_knowledge_catalog",
             error_type="EmptyPolicyQuery",
@@ -97,7 +111,12 @@ def query_knowledge_catalog(query: str) -> Dict[str, Any]:
             ),
         ).model_dump()
     except Exception as exc:
-        logger.error("Unexpected error in query_knowledge_catalog: %s", exc)
+        logger.error(
+            "tool_execution_exception",
+            tool_name="query_knowledge_catalog",
+            error_type="KnowledgeCorpusException",
+            error=str(exc),
+        )
         return ToolErrorRecoveryResponse(
             tool_name="query_knowledge_catalog",
             error_type="KnowledgeCorpusException",

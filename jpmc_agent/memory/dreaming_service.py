@@ -3,8 +3,12 @@
 import uuid
 from typing import Dict, Any, List
 from datetime import datetime, timezone
+import structlog
 from ..models import MemoryFragment
+from ..observability import get_structured_logger
 from .memory_bank import memory_bank_store
+
+logger = get_structured_logger("jpmc_agent.memory.dreaming_service")
 
 
 class DreamingCompactionService:
@@ -19,6 +23,7 @@ class DreamingCompactionService:
         """Runs the dreaming compaction pass on the customer's raw memory fragments."""
         raw_fragments = memory_bank_store.get_memories(customer_id)
         if not raw_fragments:
+            logger.info("dreaming_compaction_noop", customer_id=customer_id, fragment_count=0)
             return {
                 "customer_id": customer_id,
                 "status": "NO_OP",
@@ -74,6 +79,15 @@ class DreamingCompactionService:
         # In state store, prepend or replace with compacted memory
         memory_bank_store._storage[customer_id] = [compacted_fragment]
 
+        logger.info(
+            "dreaming_compaction_completed",
+            customer_id=customer_id,
+            source_fragment_count=len(raw_fragments),
+            raw_token_count=estimated_raw_tokens,
+            compacted_token_count=compacted_tokens,
+            token_reduction_percentage=f"{token_reduction_pct}%",
+            compacted_fragment_id=compacted_fragment.fragment_id,
+        )
         return {
             "customer_id": customer_id,
             "status": "COMPACTED",

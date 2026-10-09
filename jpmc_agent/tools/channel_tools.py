@@ -1,11 +1,12 @@
 """Multi-channel telemetry tools for IVR, Mobile App, and Travel Registry."""
 
-import logging
 from typing import Dict, Any, List
+import structlog
 from ..config import DEFAULT_CUSTOMER
 from ..models import ToolErrorRecoveryResponse
+from ..observability import get_structured_logger
 
-logger = logging.getLogger("jpmc_agent.tools.channel")
+logger = get_structured_logger("jpmc_agent.tools.channel")
 
 
 def query_telephony_ivr_logs(customer_id: str = "alex_morgan") -> Dict[str, Any]:
@@ -25,6 +26,13 @@ def query_telephony_ivr_logs(customer_id: str = "alex_morgan") -> Dict[str, Any]
         if not customer_id or not isinstance(customer_id, str) or not customer_id.strip():
             raise ValueError("customer_id must be a non-empty string.")
 
+        logger.info(
+            "telephony_ivr_logs_queried",
+            tool_name="query_telephony_ivr_logs",
+            customer_id=customer_id,
+            session_id="ivr-sess-99412",
+            outcome="AUTH_FAILED_INCOMPLETE",
+        )
         return {
             "status": "SUCCESS",
             "customer_id": customer_id,
@@ -43,7 +51,13 @@ def query_telephony_ivr_logs(customer_id: str = "alex_morgan") -> Dict[str, Any]
             ],
         }
     except ValueError as exc:
-        logger.warning("Validation error in query_telephony_ivr_logs: %s", exc)
+        logger.warning(
+            "tool_validation_error",
+            tool_name="query_telephony_ivr_logs",
+            error_type="InvalidCustomerId",
+            error=str(exc),
+            fallback_tool="query_mobile_wallet_events",
+        )
         return ToolErrorRecoveryResponse(
             tool_name="query_telephony_ivr_logs",
             error_type="InvalidCustomerId",
@@ -56,7 +70,13 @@ def query_telephony_ivr_logs(customer_id: str = "alex_morgan") -> Dict[str, Any]
             ),
         ).model_dump()
     except Exception as exc:
-        logger.error("Unexpected error in query_telephony_ivr_logs: %s", exc)
+        logger.error(
+            "tool_execution_exception",
+            tool_name="query_telephony_ivr_logs",
+            error_type=type(exc).__name__,
+            error=str(exc),
+            fallback_tool="fetch_live_account_statement",
+        )
         return ToolErrorRecoveryResponse(
             tool_name="query_telephony_ivr_logs",
             error_type=type(exc).__name__,
@@ -86,6 +106,12 @@ def query_mobile_wallet_events(customer_id: str = "alex_morgan") -> Dict[str, An
         if not customer_id or not isinstance(customer_id, str) or not customer_id.strip():
             raise ValueError("customer_id must be a non-empty string.")
 
+        logger.info(
+            "mobile_wallet_events_queried",
+            tool_name="query_mobile_wallet_events",
+            customer_id=customer_id,
+            error_code="CARD_STATUS_LOCKED_RESTRICTED",
+        )
         return {
             "status": "SUCCESS",
             "customer_id": customer_id,
@@ -104,7 +130,13 @@ def query_mobile_wallet_events(customer_id: str = "alex_morgan") -> Dict[str, An
             ],
         }
     except ValueError as exc:
-        logger.warning("Validation error in query_mobile_wallet_events: %s", exc)
+        logger.warning(
+            "tool_validation_error",
+            tool_name="query_mobile_wallet_events",
+            error_type="InvalidCustomerId",
+            error=str(exc),
+            fallback_tool="get_card_status",
+        )
         return ToolErrorRecoveryResponse(
             tool_name="query_mobile_wallet_events",
             error_type="InvalidCustomerId",
@@ -117,7 +149,13 @@ def query_mobile_wallet_events(customer_id: str = "alex_morgan") -> Dict[str, An
             ),
         ).model_dump()
     except Exception as exc:
-        logger.error("Unexpected error in query_mobile_wallet_events: %s", exc)
+        logger.error(
+            "tool_execution_exception",
+            tool_name="query_mobile_wallet_events",
+            error_type=type(exc).__name__,
+            error=str(exc),
+            fallback_tool="get_card_status",
+        )
         return ToolErrorRecoveryResponse(
             tool_name="query_mobile_wallet_events",
             error_type=type(exc).__name__,
@@ -148,6 +186,13 @@ def query_travel_registry(customer_id: str = "alex_morgan") -> Dict[str, Any]:
         if not customer_id or not isinstance(customer_id, str) or not customer_id.strip():
             raise ValueError("customer_id must be a non-empty string.")
 
+        logger.info(
+            "travel_registry_queried",
+            tool_name="query_travel_registry",
+            customer_id=customer_id,
+            notice_id="TRV-88291-UK",
+            destination="London, United Kingdom",
+        )
         return {
             "status": "SUCCESS",
             "customer_id": customer_id,
@@ -166,7 +211,13 @@ def query_travel_registry(customer_id: str = "alex_morgan") -> Dict[str, Any]:
             ],
         }
     except ValueError as exc:
-        logger.warning("Validation error in query_travel_registry: %s", exc)
+        logger.warning(
+            "tool_validation_error",
+            tool_name="query_travel_registry",
+            error_type="InvalidCustomerId",
+            error=str(exc),
+            fallback_tool="fetch_live_account_statement",
+        )
         return ToolErrorRecoveryResponse(
             tool_name="query_travel_registry",
             error_type="InvalidCustomerId",
@@ -179,7 +230,13 @@ def query_travel_registry(customer_id: str = "alex_morgan") -> Dict[str, Any]:
             ),
         ).model_dump()
     except Exception as exc:
-        logger.error("Unexpected error in query_travel_registry: %s", exc)
+        logger.error(
+            "tool_execution_exception",
+            tool_name="query_travel_registry",
+            error_type=type(exc).__name__,
+            error=str(exc),
+            fallback_tool="fetch_live_account_statement",
+        )
         return ToolErrorRecoveryResponse(
             tool_name="query_travel_registry",
             error_type=type(exc).__name__,

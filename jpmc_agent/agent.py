@@ -4,15 +4,15 @@ Implements the multi-agent mesh architecture evaluated against:
   1. Tool & Interface Design (13 typed tools with guided try-except LLM recovery instructions)
   2. Context & Memory (Vertex AI Scale Memory Bank + Asynchronous Dreaming Compaction)
   3. Orchestration & Logic (Strategic Multi-Model Routing + Programmatic HITL Code Stops + 5-Avenue Veracity Gatekeeper)
-  4. Observability & Tracing (OpenTelemetry Spans + Cloud Trace Integration + PCI-DSS Redaction)
+  4. Observability & Tracing (Structlog / Python-JSON-Logger Structured JSON Logging + OpenTelemetry Spans + PCI-DSS Redaction)
   5. Infrastructure & CI/CD (Declarative Terraform IaC + Cloud Run + Automated Eval Suites)
 """
 
-import logging
 import re
 import time
 import uuid
 from typing import Any, Dict, Optional
+import structlog
 from google.adk.agents.llm_agent import Agent
 from google.adk.tools import preload_memory, load_memory
 
@@ -28,6 +28,11 @@ from .config import (
     DEFAULT_CUSTOMER,
 )
 from .models import HumanInTheLoopInterrupt
+from .observability import (
+    configure_structured_json_logging,
+    get_structured_logger,
+    redact_pci_pii_value,
+)
 from .memory.memory_bank import memory_bank_store
 from .tools import (
     fetch_live_account_statement,
@@ -46,7 +51,8 @@ from .tools import (
     query_knowledge_catalog,
 )
 
-logger = logging.getLogger("jpmc_agent")
+configure_structured_json_logging()
+logger = get_structured_logger("jpmc_agent.orchestrator")
 
 # Optional OpenTelemetry SDK Tracer initialization with safe fallback
 try:
@@ -96,18 +102,23 @@ class StrategicModelRouter:
 
 def redact_pci_pii(data: Any) -> Any:
     """Scrubs raw 16-digit PANs and 3-digit CVVs from telemetry logs for PCI-DSS compliance."""
-    text = str(data)
+    text = str(redact_pci_pii_value(data))
     # Mask any unmasked 13-to-16 digit card numbers
     text = re.sub(r"\b(?:\d[ -]*?){13,16}\b", "************REDACTED", text)
     return text
 
 
 def record_telemetry_span(span_type: str, name: str, details: Dict[str, Any], duration_ms: float = 0.0):
-    """Appends an OpenTelemetry-compliant trace span to the in-memory telemetry buffer and OTel tracer."""
-    sanitized_details = {k: redact_pci_pii(v) if isinstance(v, str) else v for k, v in details.items()}
+    """Appends an OpenTelemetry-compliant trace span to the buffer and emits a structured JSON log event."""
+    sanitized_details = {
+        k: redact_pci_pii(v) if isinstance(v, str) else redact_pci_pii_value(v, key_name=str(k))
+        for k, v in details.items()
+    }
+    span_id = f"span-{len(GLOBAL_TELEMETRY_SPANS)+1:04d}"
+    trace_id = f"trace-{uuid.uuid4().hex[:12]}"
     span = {
-        "span_id": f"span-{len(GLOBAL_TELEMETRY_SPANS)+1:04d}",
-        "trace_id": f"trace-{uuid.uuid4().hex[:12]}",
+        "span_id": span_id,
+        "trace_id": trace_id,
         "type": span_type,
         "name": name,
         "timestamp": time.time(),
@@ -122,13 +133,32 @@ def record_telemetry_span(span_type: str, name: str, details: Dict[str, Any], du
         with _OTEL_TRACER.start_as_current_span(f"{span_type}:{name}") as otel_span:
             otel_span.set_attribute("jpmc.span.type", span_type)
             otel_span.set_attribute("jpmc.span.duration_ms", round(duration_ms, 2))
+            logger.info(
+                "telemetry_span_recorded",
+                span_type=span_type,
+                span_name=name,
+                span_id=span_id,
+                trace_id=trace_id,
+                duration_ms=round(duration_ms, 2),
+                details=sanitized_details,
+            )
+    else:
+        logger.info(
+            "telemetry_span_recorded",
+            span_type=span_type,
+            span_name=name,
+            span_id=span_id,
+            trace_id=trace_id,
+            duration_ms=round(duration_ms, 2),
+            details=sanitized_details,
+        )
 
 
 # -----------------------------------------------------------------------------
 # OpenTelemetry & Programmatic Human-in-the-Loop (HITL) Guardrail Callbacks
 # -----------------------------------------------------------------------------
 def telemetry_before_tool(tool: Any, args: Dict[str, Any], context: Any) -> Optional[Dict[str, Any]]:
-    """Pre-execution hook enforcing programmatic HITL code stops for high-stakes actions and OTel tracing."""
+    """Pre-execution hook enforcing programmatic HITL code stops for high-stakes actions and OTel JSON tracing."""
     tool_name = getattr(tool, "name", getattr(tool, "__name__", str(tool)))
     if hasattr(context, "state") and isinstance(context.state, dict):
         context.state["_tool_start_time"] = time.time()
@@ -173,6 +203,13 @@ def telemetry_before_tool(tool: Any, args: Dict[str, Any], context: Any) -> Opti
                 ),
             ).model_dump()
 
+            logger.warning(
+                "hitl_code_stop_intercepted",
+                tool_name=tool_name,
+                interrupt_id=interrupt_payload["interrupt_id"],
+                risk_level=interrupt_payload["risk_level"],
+                reason=interrupt_payload["reason"],
+            )
             record_telemetry_span(
                 span_type="HITL_CODE_STOP_TRIGGERED",
                 name=tool_name,

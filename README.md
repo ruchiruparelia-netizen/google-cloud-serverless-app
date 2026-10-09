@@ -39,9 +39,9 @@ See full detailed analysis in [architecture_evaluation.md](file:///Users/ruchiru
 | :--- | :---: | :---: | :--- |
 | **1. Tool & Interface Design** | 19 | **19** | 12 typed ADK tools; atomic 1-click resolution; authentic JPMC Chase Octagon UI with live virtual card viewer & Apple/Google Wallet push. |
 | **2. Context & Memory** | 19 | **19** | Vertex AI Scale Memory Bank; turn-start preloading; Dreaming Service compaction (>65% token savings); 5-avenue pre-write veracity gatekeeping. |
-| **3. Orchestration & Logic** | 19 | **19** | Multi-agent mesh (Lead Synthesizer + 4 domain sub-agents); zero-question root-cause diagnosis; Reg E / Reg Z compliance. |
-| **4. Observability & Tracing** | 19 | **19** | OpenTelemetry spans across agent turns and tool calls; Cloud Trace readiness; PAN (*4821) and PII masking. |
-| **5. Infrastructure & CI/CD** | 19 | **19** | Serverless Cloud Run multi-stage Dockerfile; automated GitHub Actions & Cloud Build CI/CD; ADK test JSON fixtures & pytest suite. |
+| **3. Orchestration & Logic** | 19 | **19** | Multi-agent mesh (Lead Synthesizer + 4 domain sub-agents); strategic multi-model routing (`pro`/`flash`/`flash-lite`); programmatic HITL code stops. |
+| **4. Observability & Tracing** | 19 | **19** | Structured JSON logging via `structlog` & `python-json-logger` (`jpmc_agent/observability.py`); OpenTelemetry spans; pre/post-tool callbacks; regex PAN/PII redaction. |
+| **5. Infrastructure & CI/CD** | 19 | **19** | Declarative Terraform IaC (`terraform/main.tf`) & Knative (`deployment.yaml`); Serverless Cloud Run; ADK test JSON fixtures & pytest suite. |
 | **TOTAL** | **95** | **95 / 95** | **100% Benchmark Score** |
 
 ---

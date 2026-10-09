@@ -1,11 +1,12 @@
 """Account, core ledger, and card status tools for JPMC Agent."""
 
-import logging
 from typing import Dict, Any, List
+import structlog
 from ..config import DEFAULT_CUSTOMER
 from ..models import ToolErrorRecoveryResponse
+from ..observability import get_structured_logger
 
-logger = logging.getLogger("jpmc_agent.tools.account")
+logger = get_structured_logger("jpmc_agent.tools.account")
 
 
 def fetch_live_account_statement(customer_id: str = "alex_morgan") -> Dict[str, Any]:
@@ -33,6 +34,13 @@ def fetch_live_account_statement(customer_id: str = "alex_morgan") -> Dict[str, 
         if not card_info:
             raise RuntimeError("Active card record missing from customer ledger profile.")
 
+        logger.info(
+            "account_statement_retrieved",
+            tool_name="fetch_live_account_statement",
+            customer_id=customer_id,
+            masked_pan="************4821",
+            status="SUCCESS",
+        )
         return {
             "status": "SUCCESS",
             "customer_id": customer_id,
@@ -77,7 +85,13 @@ def fetch_live_account_statement(customer_id: str = "alex_morgan") -> Dict[str, 
             ],
         }
     except (ValueError, KeyError) as exc:
-        logger.warning("Validation error in fetch_live_account_statement: %s", exc)
+        logger.warning(
+            "tool_validation_error",
+            tool_name="fetch_live_account_statement",
+            error_type=type(exc).__name__,
+            error=str(exc),
+            fallback_tool="get_card_status",
+        )
         return ToolErrorRecoveryResponse(
             tool_name="fetch_live_account_statement",
             error_type=type(exc).__name__,
@@ -92,7 +106,13 @@ def fetch_live_account_statement(customer_id: str = "alex_morgan") -> Dict[str, 
             ),
         ).model_dump()
     except Exception as exc:
-        logger.error("Unexpected ledger failure in fetch_live_account_statement: %s", exc)
+        logger.error(
+            "tool_execution_exception",
+            tool_name="fetch_live_account_statement",
+            error_type="LedgerServiceException",
+            error=str(exc),
+            fallback_tool="query_fraud_velocity_alerts",
+        )
         return ToolErrorRecoveryResponse(
             tool_name="fetch_live_account_statement",
             error_type="LedgerServiceException",
@@ -128,6 +148,12 @@ def get_card_status(card_last4: str = "4821") -> Dict[str, Any]:
             )
 
         card = DEFAULT_CUSTOMER["active_card"]
+        logger.info(
+            "card_status_checked",
+            tool_name="get_card_status",
+            card_last4=cleaned_last4,
+            card_status=card["status"],
+        )
         return {
             "status_code": "SUCCESS",
             "card_product": card["product"],
@@ -140,7 +166,13 @@ def get_card_status(card_last4: str = "4821") -> Dict[str, Any]:
             "instant_vcn_eligible": True,
         }
     except ValueError as exc:
-        logger.warning("Invalid card_last4 parameter in get_card_status: %s", exc)
+        logger.warning(
+            "tool_validation_error",
+            tool_name="get_card_status",
+            error_type="InvalidCardLast4Format",
+            error=str(exc),
+            fallback_tool="fetch_live_account_statement",
+        )
         return ToolErrorRecoveryResponse(
             tool_name="get_card_status",
             error_type="InvalidCardLast4Format",
@@ -153,7 +185,13 @@ def get_card_status(card_last4: str = "4821") -> Dict[str, Any]:
             ),
         ).model_dump()
     except Exception as exc:
-        logger.error("Unexpected error in get_card_status: %s", exc)
+        logger.error(
+            "tool_execution_exception",
+            tool_name="get_card_status",
+            error_type=type(exc).__name__,
+            error=str(exc),
+            fallback_tool="fetch_live_account_statement",
+        )
         return ToolErrorRecoveryResponse(
             tool_name="get_card_status",
             error_type=type(exc).__name__,

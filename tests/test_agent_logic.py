@@ -89,3 +89,27 @@ def test_token_usage_summary_endpoint():
     assert data["last_turn"]["input_tokens"] > 0
     assert data["last_turn"]["output_tokens"] > 0
 
+
+def test_structured_json_logging_and_pci_redaction(capsys):
+    import json
+    from jpmc_agent.observability import get_structured_logger
+
+    structured_logger = get_structured_logger("jpmc_agent.test_json")
+    structured_logger.info(
+        "test_pci_json_event",
+        customer_id="alex_morgan",
+        raw_pan_sample="Card 4147 2024 8888 4821 failed",
+        cvv="419",
+    )
+    captured = capsys.readouterr().out.strip().splitlines()
+    assert len(captured) >= 1
+    payload = json.loads(captured[-1])
+    assert payload["event"] == "test_pci_json_event"
+    assert payload["severity"] == "INFO"
+    assert payload["service"] == "jpmc-cross-channel-card-agent"
+    assert "timestamp" in payload
+    assert "4147 2024 8888 4821" not in payload["raw_pan_sample"]
+    assert "************REDACTED" in payload["raw_pan_sample"]
+    assert payload["cvv"] == "***REDACTED_CVV***"
+
+

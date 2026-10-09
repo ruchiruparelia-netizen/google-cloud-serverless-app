@@ -1,16 +1,17 @@
 """5-Avenue Pre-Write Claim Veracity Validation Tool for JPMC Agent Platform."""
 
-import logging
 import uuid
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
+import structlog
 from ..config import HITL_LOW_VERACITY_CONFIDENCE_THRESHOLD
 from ..models import VeracityEvaluation, ToolErrorRecoveryResponse
+from ..observability import get_structured_logger
 from .account_tools import fetch_live_account_statement
 from .channel_tools import query_travel_registry
 from .fraud_tools import audit_step_up_consent_logs, query_fraud_velocity_alerts
 
-logger = logging.getLogger("jpmc_agent.tools.veracity")
+logger = get_structured_logger("jpmc_agent.tools.veracity")
 
 
 def validate_and_record_customer_claim(
@@ -136,9 +137,23 @@ def validate_and_record_customer_claim(
             },
         )
 
+        logger.info(
+            "claim_veracity_evaluated",
+            tool_name="validate_and_record_customer_claim",
+            customer_id=customer_id,
+            claim_id=eval_result.claim_id,
+            veracity_status=status,
+            confidence_score=confidence,
+        )
         return eval_result.model_dump()
     except ValueError as exc:
-        logger.warning("Validation error in validate_and_record_customer_claim: %s", exc)
+        logger.warning(
+            "tool_validation_error",
+            tool_name="validate_and_record_customer_claim",
+            error_type="InvalidClaimInput",
+            error=str(exc),
+            fallback_tool="fetch_live_account_statement",
+        )
         return ToolErrorRecoveryResponse(
             tool_name="validate_and_record_customer_claim",
             error_type="InvalidClaimInput",
@@ -151,7 +166,13 @@ def validate_and_record_customer_claim(
             ),
         ).model_dump()
     except Exception as exc:
-        logger.error("Unexpected error in validate_and_record_customer_claim: %s", exc)
+        logger.error(
+            "tool_execution_exception",
+            tool_name="validate_and_record_customer_claim",
+            error_type="VeracityGatekeeperException",
+            error=str(exc),
+            fallback_tool="query_fraud_velocity_alerts",
+        )
         return ToolErrorRecoveryResponse(
             tool_name="validate_and_record_customer_claim",
             error_type="VeracityGatekeeperException",

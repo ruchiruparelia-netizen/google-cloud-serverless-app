@@ -1,9 +1,9 @@
 """Card operations, instant VCN issuance, and emergency courier logistics tools for JPMC Agent."""
 
-import logging
 import uuid
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone, timedelta
+import structlog
 from ..models import (
     VirtualCardNumber,
     CourierShipment,
@@ -12,9 +12,10 @@ from ..models import (
     HumanInTheLoopInterrupt,
 )
 from ..config import DEFAULT_CUSTOMER, HITL_HIGH_SPENDING_LIMIT_THRESHOLD_USD
+from ..observability import get_structured_logger
 from .fraud_tools import file_fraud_dispute
 
-logger = logging.getLogger("jpmc_agent.tools.card_ops")
+logger = get_structured_logger("jpmc_agent.tools.card_ops")
 
 
 def request_human_in_the_loop_approval(
@@ -42,7 +43,7 @@ def request_human_in_the_loop_approval(
         if not action_name or not str(action_name).strip():
             raise ValueError("action_name must be specified when requesting HITL approval.")
 
-        return HumanInTheLoopInterrupt(
+        interrupt = HumanInTheLoopInterrupt(
             interrupt_id=f"hitl-req-{uuid.uuid4().hex[:8]}",
             action_name=action_name,
             risk_level="HIGH_STAKES_BANKING_MUTATION",
@@ -53,8 +54,21 @@ def request_human_in_the_loop_approval(
                 "Wait for explicit confirmation ('Yes, I approve') before invoking the target tool with `human_approved=True`."
             ),
         ).model_dump()
+        logger.info(
+            "hitl_approval_requested",
+            tool_name="request_human_in_the_loop_approval",
+            action_name=action_name,
+            customer_id=customer_id,
+            interrupt_id=interrupt["interrupt_id"],
+        )
+        return interrupt
     except Exception as exc:
-        logger.warning("Error in request_human_in_the_loop_approval: %s", exc)
+        logger.warning(
+            "tool_validation_error",
+            tool_name="request_human_in_the_loop_approval",
+            error_type=type(exc).__name__,
+            error=str(exc),
+        )
         return ToolErrorRecoveryResponse(
             tool_name="request_human_in_the_loop_approval",
             error_type=type(exc).__name__,
@@ -102,6 +116,13 @@ def provision_instant_virtual_card(
         if not human_approved or (
             numeric_limit > HITL_HIGH_SPENDING_LIMIT_THRESHOLD_USD and not hitl_confirmation_token
         ):
+            logger.info(
+                "hitl_code_stop_triggered",
+                tool_name="provision_instant_virtual_card",
+                customer_id=customer_id,
+                spending_limit=numeric_limit,
+                human_approved=human_approved,
+            )
             return HumanInTheLoopInterrupt(
                 interrupt_id=f"hitl-vcn-{uuid.uuid4().hex[:8]}",
                 action_name="provision_instant_virtual_card",
@@ -133,9 +154,23 @@ def provision_instant_virtual_card(
             push_to_google_wallet_ready=True,
             spending_limit=numeric_limit,
         )
+        logger.info(
+            "virtual_card_provisioned",
+            tool_name="provision_instant_virtual_card",
+            customer_id=customer_id,
+            vcn_id=vcn.vcn_id,
+            masked_pan=vcn.masked_pan,
+            spending_limit=numeric_limit,
+        )
         return vcn.model_dump()
     except (ValueError, TypeError) as exc:
-        logger.warning("Validation error in provision_instant_virtual_card: %s", exc)
+        logger.warning(
+            "tool_validation_error",
+            tool_name="provision_instant_virtual_card",
+            error_type=type(exc).__name__,
+            error=str(exc),
+            fallback_tool="get_card_status",
+        )
         return ToolErrorRecoveryResponse(
             tool_name="provision_instant_virtual_card",
             error_type=type(exc).__name__,
@@ -148,7 +183,13 @@ def provision_instant_virtual_card(
             ),
         ).model_dump()
     except Exception as exc:
-        logger.error("Unexpected error in provision_instant_virtual_card: %s", exc)
+        logger.error(
+            "tool_execution_exception",
+            tool_name="provision_instant_virtual_card",
+            error_type="TokenizationGatewayException",
+            error=str(exc),
+            fallback_tool="dispatch_emergency_courier",
+        )
         return ToolErrorRecoveryResponse(
             tool_name="provision_instant_virtual_card",
             error_type="TokenizationGatewayException",
@@ -188,6 +229,12 @@ def dispatch_emergency_courier(
             raise ValueError("customer_id must be a non-empty string.")
 
         if not human_approved:
+            logger.info(
+                "hitl_code_stop_triggered",
+                tool_name="dispatch_emergency_courier",
+                customer_id=customer_id,
+                human_approved=human_approved,
+            )
             return HumanInTheLoopInterrupt(
                 interrupt_id=f"hitl-ship-{uuid.uuid4().hex[:8]}",
                 action_name="dispatch_emergency_courier",
@@ -218,9 +265,22 @@ def dispatch_emergency_courier(
             estimated_delivery=est_delivery,
             status="DISPATCHED_TO_COURIER",
         )
+        logger.info(
+            "emergency_courier_dispatched",
+            tool_name="dispatch_emergency_courier",
+            customer_id=customer_id,
+            tracking_number=shipment.tracking_number,
+            destination_address=dest,
+        )
         return shipment.model_dump()
     except ValueError as exc:
-        logger.warning("Address validation error in dispatch_emergency_courier: %s", exc)
+        logger.warning(
+            "tool_validation_error",
+            tool_name="dispatch_emergency_courier",
+            error_type="InvalidShippingAddress",
+            error=str(exc),
+            fallback_tool="query_travel_registry",
+        )
         return ToolErrorRecoveryResponse(
             tool_name="dispatch_emergency_courier",
             error_type="InvalidShippingAddress",
@@ -234,7 +294,13 @@ def dispatch_emergency_courier(
             ),
         ).model_dump()
     except Exception as exc:
-        logger.error("Unexpected error in dispatch_emergency_courier: %s", exc)
+        logger.error(
+            "tool_execution_exception",
+            tool_name="dispatch_emergency_courier",
+            error_type="CourierLogisticsException",
+            error=str(exc),
+            fallback_tool="provision_instant_virtual_card",
+        )
         return ToolErrorRecoveryResponse(
             tool_name="dispatch_emergency_courier",
             error_type="CourierLogisticsException",
@@ -283,7 +349,12 @@ def execute_one_click_card_unlock_and_replacement(
 
         # PROGRAMMATIC HUMAN-IN-THE-LOOP (HITL) CODE STOP FOR IRREVERSIBLE CARD REVOCATION
         if not human_approved:
-            logger.info("Programmatic HITL Code Stop triggered on execute_one_click_card_unlock_and_replacement")
+            logger.info(
+                "hitl_code_stop_triggered",
+                tool_name="execute_one_click_card_unlock_and_replacement",
+                customer_id=customer_id,
+                human_approved=human_approved,
+            )
             return HumanInTheLoopInterrupt(
                 interrupt_id=f"hitl-1click-{uuid.uuid4().hex[:8]}",
                 action_name="execute_one_click_card_unlock_and_replacement",
@@ -355,9 +426,23 @@ def execute_one_click_card_unlock_and_replacement(
             summary_message=summary,
         )
 
+        logger.info(
+            "one_click_resolution_completed",
+            tool_name="execute_one_click_card_unlock_and_replacement",
+            customer_id=customer_id,
+            audit_trace_id=audit_trace,
+            vcn_last4=vcn_data["last4"],
+            tracking_number=courier_data["tracking_number"],
+        )
         return result.model_dump()
     except (ValueError, RuntimeError) as exc:
-        logger.warning("Error in execute_one_click_card_unlock_and_replacement: %s", exc)
+        logger.warning(
+            "tool_validation_error",
+            tool_name="execute_one_click_card_unlock_and_replacement",
+            error_type=type(exc).__name__,
+            error=str(exc),
+            fallback_tool="provision_instant_virtual_card",
+        )
         return ToolErrorRecoveryResponse(
             tool_name="execute_one_click_card_unlock_and_replacement",
             error_type=type(exc).__name__,
@@ -372,7 +457,13 @@ def execute_one_click_card_unlock_and_replacement(
             ),
         ).model_dump()
     except Exception as exc:
-        logger.error("Unexpected failure in execute_one_click_card_unlock_and_replacement: %s", exc)
+        logger.error(
+            "tool_execution_exception",
+            tool_name="execute_one_click_card_unlock_and_replacement",
+            error_type="AtomicResolutionFailure",
+            error=str(exc),
+            fallback_tool="provision_instant_virtual_card",
+        )
         return ToolErrorRecoveryResponse(
             tool_name="execute_one_click_card_unlock_and_replacement",
             error_type="AtomicResolutionFailure",
