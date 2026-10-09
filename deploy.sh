@@ -10,7 +10,8 @@ set -euo pipefail
 PROJECT_ID="${GOOGLE_CLOUD_PROJECT:-$(gcloud config get-value project 2>/dev/null || echo "ruchi-agent-poc")}"
 REGION="${GOOGLE_CLOUD_REGION:-us-central1}"
 SERVICE_NAME="jpmc-card-fraud-agent"
-IMAGE_NAME="gcr.io/${PROJECT_ID}/${SERVICE_NAME}:latest"
+REPO_NAME="jpmc-agents-repo"
+IMAGE_NAME="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${SERVICE_NAME}:latest"
 
 echo "=========================================================================="
 echo "  Deploying JPMC Cross-Channel Credit Card & Fraud Mitigation Agent"
@@ -39,7 +40,7 @@ gcloud services enable \
 PROJECT_NUMBER=$(gcloud projects describe "${PROJECT_ID}" --format='value(projectNumber)' 2>/dev/null || echo "")
 if [ -n "${PROJECT_NUMBER}" ]; then
   echo "Setting IAM permissions (Logging, Storage, Artifact Registry) for project service accounts..."
-  for ROLE in "roles/logging.logWriter" "roles/storage.objectAdmin" "roles/artifactregistry.writer"; do
+  for ROLE in "roles/logging.logWriter" "roles/storage.objectAdmin" "roles/artifactregistry.admin" "roles/artifactregistry.writer"; do
     gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
       --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
       --role="${ROLE}" --quiet 2>/dev/null || true
@@ -49,10 +50,25 @@ if [ -n "${PROJECT_NUMBER}" ]; then
   done
 fi
 
-# 3. Build & Deploy to Serverless Cloud Run via Source (Artifact Registry)
-echo "Step 2: Deploying container directly from source to Cloud Run..."
+# Create Artifact Registry repository if it doesn't exist
+echo "Step 2: Ensuring Artifact Registry repository '${REPO_NAME}' exists..."
+gcloud artifacts repositories describe "${REPO_NAME}" \
+  --location="${REGION}" \
+  --project="${PROJECT_ID}" >/dev/null 2>&1 || \
+gcloud artifacts repositories create "${REPO_NAME}" \
+  --repository-format=docker \
+  --location="${REGION}" \
+  --description="JPMC Agent Docker Repository" \
+  --project="${PROJECT_ID}"
+
+# 3. Build & Submit Container Image to Artifact Registry
+echo "Step 3: Building container image in Cloud Build..."
+gcloud builds submit --tag "${IMAGE_NAME}" --project="${PROJECT_ID}"
+
+# 4. Deploy to Serverless Cloud Run
+echo "Step 4: Deploying container to Cloud Run..."
 gcloud run deploy "${SERVICE_NAME}" \
-  --source . \
+  --image="${IMAGE_NAME}" \
   --platform=managed \
   --region="${REGION}" \
   --allow-unauthenticated \
